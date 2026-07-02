@@ -9,18 +9,36 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
       - name: Ping Supabase REST API
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_HEARTBEAT_TABLE: ${{ secrets.SUPABASE_HEARTBEAT_TABLE }}
         run: |
           set -euo pipefail
-          ENDPOINT="${SUPABASE_URL}/rest/v1/${SUPABASE_HEARTBEAT_TABLE}?select=id&limit=1"
-          curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
-            -H "apikey: ${SUPABASE_SECRET_KEY}" \
-            -H "Authorization: Bearer ${SUPABASE_SECRET_KEY}" \
+
+          # Secrets opschonen: whitespace/newlines en trailing slash zijn de
+          # gebruikelijke oorzaak van een 404 op een verder correct endpoint
+          BASE="$(printf '%s' "${SUPABASE_URL}" | tr -d '[:space:]')"
+          BASE="${BASE%/}"
+          BASE="${BASE%/rest/v1}"
+          TABLE="$(printf '%s' "${SUPABASE_HEARTBEAT_TABLE}" | tr -d '[:space:]')"
+          KEY="$(printf '%s' "${SUPABASE_PUBLISHABLE_KEY}" | tr -d '[:space:]')"
+
+          ENDPOINT="${BASE}/rest/v1/${TABLE}?select=id&limit=1"
+          echo "Pinging: ${BASE}/rest/v1/${TABLE}"
+
+          HTTP_CODE="$(curl -sS --retry 3 --retry-delay 2 --retry-all-errors \
+            -o /tmp/heartbeat-body.json -w '%{http_code}' \
+            -H "apikey: ${KEY}" \
+            -H "Authorization: Bearer ${KEY}" \
             -H "Accept: application/json" \
-            "${ENDPOINT}"
+            "${ENDPOINT}")"
+
+          echo "HTTP status: ${HTTP_CODE}"
+          if [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 300 ]; then
+            echo "Response body:"
+            cat /tmp/heartbeat-body.json
+            exit 1
+          fi
