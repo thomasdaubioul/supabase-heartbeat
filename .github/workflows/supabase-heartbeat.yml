@@ -20,7 +20,7 @@ jobs:
           set -euo pipefail
           ENDPOINT="${SUPABASE_URL}/rest/v1/${SUPABASE_HEARTBEAT_TABLE}?select=id&limit=1"
           curl -fsS --retry 3 --retry-delay 2 --retry-all-errors \
-          -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
             -H "Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}" \
             -H "Accept: application/json" \
             "${ENDPOINT}"
